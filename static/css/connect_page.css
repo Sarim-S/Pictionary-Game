@@ -1,0 +1,59 @@
+body {
+    background: #444; 
+    color: white; 
+    font-family: 'Patrick Hand', sans-serif;
+    height: 100vh; 
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.center-container {
+    background: rgba(255, 255, 255, 0.1); 
+    border: 2px solid white; 
+    border-radius: 10px; 
+    padding: 20px; 
+    text-align: center;
+    width: 400px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); 
+}
+
+.login-title {
+    margin-bottom: 20px;
+    font-size: 1.5rem; 
+    color: white; 
+}
+
+#username {
+    width: 80%; 
+    padding: 10px;
+    margin-bottom: 15px;
+    background-color: transparent; 
+    border: 2px solid white; 
+    border-radius: 5px; 
+    color: white;
+    font-family: 'Patrick Hand', sans-serif; 
+    font-size: 1rem;
+}
+
+#username::placeholder {
+    color: lightgray; 
+    opacity: 1; 
+}
+
+#join {
+    background-color: transparent; 
+    color: white;
+    border: 2px solid white; 
+    border-radius: 5px; 
+    padding: 10px 20px; 
+    font-family: 'Patrick Hand', sans-serif; 
+    cursor: pointer;
+    transition: background-color 0.3s, color 0.3s; 
+}
+
+#join:hover {
+    background-color: white; 
+    color: #444; 
+}

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/game_page.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js" integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA==" crossorigin="anonymous"></script>
+    <title>Pictionary Game</title>
+</head>
+<body>
+    <div id="round-cover" class="round-cover">
+        <h1 class="round-text">Round 1</h1>
+    </div>
+    
+    <div class="container">
+        <div class="empty-space player-list-container">
+            <h2 class="player-list-title">Players</h2>
+            <ul class="player-list">
+                {% for user in usernames: %}
+                    <li class="player" id="{{ user }}">{{ user }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    
+        <div class="central-section">
+            <div class="horizontal-space">
+                <div class="top-bar">
+                    <div class="timer-box" id="timer">Time</div>
+                    <div class="word-display">
+                        <h1 id="Word"></h1>
+                    </div>
+                    <div class="score-box" id="score">Score: 0</div>
+                </div>
+            </div>
+            <div class="text-center">
+                <canvas id="myCanvas" width="800" height="475"></canvas>
+                <input type="text" id="textBox" class="form-control mt-3" placeholder="Enter your guess here...">
+            </div>
+        </div>
+    
+        <div class="options-container">
+            <button id="clear" class="btn">Clear</button>
+            <select id="lineWidth" class="form-select">
+                <option value="2">2 px</option>
+                <option value="4">4 px</option>
+                <option value="6">6 px</option>
+                <option value="8">8 px</option>
+                <option value="10">10 px</option>
+            </select>
+            <select id="colorPicker" class="form-select">
+                <option value="black">Black</option>
+                <option value="red">Red</option>
+                <option value="orange">Orange</option>
+                <option value="yellow">Yellow</option>
+                <option value="blue">Blue</option>
+                <option value="green">Green</option>
+                <option value="purple">Purple</option>
+                <option value="white">Eraser</option>
+            </select>
+        </div>
+    </div>    
+</body>
+
+<script>
+    const socket = io();
+
+    const canvas = document.getElementById("myCanvas");
+    const ctx = canvas.getContext('2d');
+    const clear = document.getElementById("clear");
+    const colourPick = document.getElementById('colorPicker');
+    const drawWidth = document.getElementById('lineWidth');
+    const inputBox = document.getElementById('textBox');
+    const word_display = document.getElementById('Word');
+    const user_list = document.getElementById('player_list');
+    const roundCover = document.getElementById("round-cover");
+    const roundText = document.querySelector(".round-text");
+    const score = document.getElementById('score');
+    const timer = document.getElementById('timer');
+    const body = document.body;
+    const user = sessionStorage.getItem('user');
+    const user_list_item = document.getElementById(user);
+    user_list_item.style.backgroundColor = '#55aa99';
+
+    let current_round = 1;
+    let word_to_guess;
+    let guess_num = 0;
+
+    let roundDuration = 60;
+    let timeInterval;
+    
+    let drawingAllowed = true;
+    let isDrawing = false;
+    let prevX, prevY;
+
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 2;  
+
+    function showRoundAnimation(roundMessage) {
+        roundText.textContent = `${roundMessage}`;        
+        roundCover.style.display = "flex";
+        
+        setTimeout(() => {
+            roundCover.style.display = "none";
+        }, 3000);
+    }
+
+    function startTimer(duration) {
+        clearInterval(timeInterval);
+        roundDuration = duration;
+        timer.innerHTML = roundDuration;
+
+        timeInterval = setInterval(() => {
+            roundDuration --;
+            timer.innerHTML = roundDuration;
+
+            if (roundDuration == 10) {
+                timer.style.color = 'red';
+            }
+
+            if (roundDuration <= 0) {
+                clearInterval(timeInterval);
+                socket.emit('round-end');
+            }
+        }, 1000)
+    }
+
+    function stoptimer() {
+        clearInterval(timeInterval);
+        timer.innerHTML = "0";
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        showRoundAnimation(`Round ${current_round}`);
+        socket.emit('start');
+    });
+
+    socket.on('next_round', function(data) {
+        setTimeout(() => {
+            current_round = data['round'];
+            showRoundAnimation(`Round ${current_round}`);
+            setTimeout(() => {
+                socket.emit('next_drawer', {"round": current_round})
+            }, 3000)
+        }, 3000)
+        
+    })
+
+    socket.on('set_drawer', function(data) {
+        setTimeout(() => {
+            word_to_guess = data['word'];
+            if (data['drawer'] == user) {
+                drawingAllowed = true;
+                inputBox.disabled = true;
+                clear.disabled = false;
+                drawWidth.disabled = false;
+                colourPick.disabled = false;
+                word_display.innerHTML = word_to_guess;
+            } else {
+                inputBox.disabled = false;
+                drawingAllowed = false;
+                clear.disabled = true;
+                drawWidth.disabled = true;
+                colourPick.disabled = true;
+                word_display.innerHTML = data['display'];
+            }
+            showRoundAnimation(`${data["drawer"]} is drawing`);
+            // startTimer(60);
+        }, 5000)
+    })
+
+    socket.on('update_list', function(data) {
+        user_list.innerHTML = "";
+        data.items.forEach(function(item) {
+            const li = document.createElement('li');
+            li.textContent = item;
+            li.classList.add('player');
+            user_list.appendChild(li);
+        })
+    })
+
+    // socket.on('set_word', function(data) {
+    //     word_to_guess = data['word'];
+    //     word_display.value = data['display'];
+    //     console.log(word_to_guess);
+    // })
+
+    inputBox.addEventListener('keydown', function(event) {
+        if (event.key == "Enter") {
+            if (inputBox.value.toLowerCase() == word_to_guess.toLowerCase()) {
+                word_display.innerHTML = word_to_guess;
+                guess_num = guess_num + 1;
+                socket.emit('correct-guess', {'username': user, 'guess_num': guess_num});
+                inputBox.disabled = true;
+
+                body.classList.add('flash-green');
+                setTimeout (() => {
+                    body.classList.remove('flash-green');
+                }, 250);
+            } else {
+                body.classList.add('flash-red');
+                guess_num = guess_num + 1;
+                setTimeout (() => {
+                    body.classList.remove('flash-red');
+                }, 250);
+            }
+            inputBox.value = "";
+
+        } 
+    })
+
+    colourPick.addEventListener('change', (event) => {
+        if (event.target.value == "white") {
+            ctx.strokeStyle = event.target.value;
+            ctx.lineWidth = 8;
+        } else {
+            ctx.strokeStyle = event.target.value;
+        }
+    })
+
+    drawWidth.addEventListener('change', (event) => {
+        ctx.lineWidth = event.target.value;
+    })
+
+    canvas.addEventListener('mousedown', (event) => {
+        if (drawingAllowed) {
+            isDrawing = true;
+            prevX = event.offsetX;
+            prevY = event.offsetY;
+            ctx.beginPath();
+            ctx.moveTo(prevX, prevY);
+        }
+    });
+
+    canvas.addEventListener('mousemove', (event) => {
+        if (isDrawing) {
+            const data = {
+                prevX: prevX,
+                prevY: prevY,
+                x: event.offsetX,
+                y: event.offsetY,
+                color: ctx.strokeStyle,
+                lineWidth: ctx.lineWidth,
+            };
+            socket.emit('drawing', data);
+            ctx.lineTo(data.x, data.y);
+            ctx.stroke();
+            prevX = event.offsetX;
+            prevY = event.offsetY;
+        }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+        isDrawing = false;
+        ctx.closePath();
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+        isDrawing = false;
+    });
+
+    clear.onclick = function() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        socket.emit('clear-canvas');
+    };
+
+    socket.on("drawing", function(data) {
+        ctx.strokeStyle = data.color;
+        ctx.lineWidth = data.lineWidth;
+        ctx.beginPath();
+        ctx.moveTo(data.prevX, data.prevY);
+        ctx.lineTo(data.x, data.y);
+        ctx.stroke();
+        ctx.closePath();
+    })
+
+    socket.on("clear-canvas", function() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    })
+
+    socket.on('update_scores', function(data) {
+        for (const key in data) {
+            if (key == user) {
+                score.innerHTML = `Score: ${data[key]}`;
+            }
+        }
+    })
+
+    // socket.on('start_timer', function() {
+    //     startTimer(60);
+    // })
+
+    socket.on('round-end', function() {
+        // stoptimer();
+        showRoundAnimation("Time's up!");
+        setTimeout(() => {
+            socket.emit('next_drawer', {'round': current_round})
+        }, 3000)
+    })
+
+    socket.on('timer_update', function(data) {
+        const timeLeft = data['time'];
+        timer.innerHTML = timeLeft;
+
+        if (timeLeft <= 10) {
+            timer.style.color = 'red';
+        }
+        if (timeLeft <= 0) {
+            clearInterval(timeInterval);
+            socket.emit('round-end');
+        }
+
+    })
+
+    socket.on('all_guessed', function() {
+        // stoptimer();
+        setTimeout(() => {
+            showRoundAnimation("Everyone got it!");
+        }, 500)
+        setTimeout(() => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = drawWidth.value;
+            ctx.strokeStyle = colourPick.value;
+            setTimeout(() => {
+                socket.emit('next_drawer', {'round': current_round});
+                inputBox.disabled = false;
+                clear.disabled = true;
+                drawWidth.disabled = true;
+                colourPick.disabled = true;
+                drawingAllowed = false;
+            }, 2000);
+        }, 3000)
+        
+    })
+
+    socket.on('game_over', function(data) {
+        setTimeout(() => {
+            sessionStorage.setItem('user', user)
+            window.location.href = data['url'];
+        }, 3000)
+    })
+
+</script>
+</html>

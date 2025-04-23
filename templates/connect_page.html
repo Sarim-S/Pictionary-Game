@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/connect_page.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js" integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA==" crossorigin="anonymous"></script>
+    <title>Pictionary Game</title>
+</head>
+<body>
+
+    <div class="center-container">
+        <h1 class="login-title" id="title">Welcome to the Game!</h1>
+        <input type="text" id="username" placeholder="Enter your username">
+        <button id="join">Join</button>
+    </div>
+
+</body>
+<script>
+    const socket = io({autoConnect: false});
+
+    const title = document.getElementById('title');
+    const join_button = document.getElementById('join');
+    const username = document.getElementById('username');
+
+    join_button.onclick = function () {
+        if (username.value != "") {
+            socket.emit("join", username.value);
+            socket.connect();
+        }
+    }
+
+    socket.on('redirect', function(data) {
+        sessionStorage.setItem('username', data['name']);
+        window.location.href = data['url'];
+    })
+
+    socket.on('set-cookie', (data) => {
+        document.cookie = `user_token=${data.token}; path=/;`;
+    });
+    
+</script>
+</html>
